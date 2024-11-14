@@ -135,7 +135,7 @@ func solve(vasyaH int, hh, ww []int) int {
 	return minMaxDh
 }
 
-func run(in io.Reader, out io.Writer) {
+func run(in io.Reader, out io.Writer, solve func(h int, hh, ww []int) int) {
 	sc := bufio.NewScanner(in)
 	sc.Split(bufio.ScanWords)
 	bw := bufio.NewWriter(out)
@@ -168,7 +168,7 @@ var _, debugEnable = os.LookupEnv("DEBUG")
 
 func main() {
 	_ = debugEnable
-	run(os.Stdin, os.Stdout)
+	run(os.Stdin, os.Stdout, solve)
 }
 
 // ----------------------------------------------------------------------------
