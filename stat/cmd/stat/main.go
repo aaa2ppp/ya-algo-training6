@@ -94,9 +94,9 @@ func readData(r io.Reader, asterisks asterisks, scores map[string]score) {
 
 		checkValue, err := strconv.Atoi(row[n-2])
 		if err != nil {
-			log.Fatalf("row%d: %w", i, err)
+			log.Fatalf("row%d: %v", i, err)
 		}
-		
+
 		if checkValue != value {
 			log.Fatalf("row%d: calculated value=%d, want %d", i, value, checkValue)
 		}
