@@ -38,12 +38,49 @@ func Test_run(t *testing.T) {
 			`WRONG`,
 			true,
 		},
-		// {
-		// 	"4",
-		// 	args{strings.NewReader(``)},
-		// 	``,
-		// 	true,
-		// },
+		{
+			"4.1",
+			args{strings.NewReader(`2(3+4*)`)},
+			`WRONG`,
+			true,
+		},
+		{
+			"4.2",
+			args{strings.NewReader(`2(3+4)*`)},
+			`WRONG`,
+			true,
+		},
+		{
+			"4.3",
+			args{strings.NewReader(`2 3+`)},
+			`WRONG`,
+			true,
+		},
+		{
+			"4.4",
+			args{strings.NewReader(`1--1`)},
+			`2`,
+			true,
+		},
+		{
+			"4.5",
+			args{strings.NewReader(`1-+1`)},
+			`0`,
+			true,
+		},
+		{
+			"4.5",
+			args{strings.NewReader(`1-++1`)},
+			`WRONG`,
+			true,
+		},
+
+		{
+			"7",
+			args{strings.NewReader(`(1+(7+8)-(3-4*5)*(2*4)+(9)-(16728)*(123*9+2)+((2)))+((((((0-19283))))))`)},
+			`-18570472`,
+			true,
+		},
 		// TODO: Add test cases.
 	}
 	for _, tt := range tests {

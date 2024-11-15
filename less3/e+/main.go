@@ -12,131 +12,130 @@ import (
 )
 
 func scanTokens(r io.ByteScanner) ([]string, bool) {
-	var tokens []string
+	const op = "scanTokens"
 
-	first := true
+	var tokens []string
+	var prevIsExpr bool // число или выражение в скобках
+
 	for {
 		c, err := r.ReadByte()
-		if debugEnable {
-			log.Printf("c: '%c'", c)
-		}
-		if err == io.EOF {
-			break
-		}
-
-		if unicode.IsSpace(rune(c)) {
-			continue
-		}
-
-		if c == '(' {
-			token := "("
-			if debugEnable {
-				log.Printf("token: '%v'", token)
-			}
-			tokens = append(tokens, token)
-			first = true
-			continue
-		}
-
-		if first {
-			first = false
-			if err := r.UnreadByte(); err != nil {
-				panic(err)
-			}
-			token, ok := scanIntStr(r)
-			if !ok {
-				return nil, false
-			}
-			if debugEnable {
-				log.Printf("token: '%v'", token)
-			}
-			tokens = append(tokens, token)
-			continue
-		}
-
-		switch c {
-		case '+', '-', '*', ')':
-			token := string(c)
-			if debugEnable {
-				log.Printf("token: '%v'", token)
-			}
-			tokens = append(tokens, token)
-		default:
-			if err := r.UnreadByte(); err != nil {
-				panic(err)
-			}
-			token, ok := scanIntStr(r)
-			if !ok {
-				return nil, false
-			}
-			if debugEnable {
-				log.Printf("token: '%v'", token)
-			}
-			tokens = append(tokens, token)
-		}
-	}
-
-	return tokens, true
-}
-
-func scanIntStr(r io.ByteScanner) (string, bool) {
-	var sb strings.Builder
-
-	// first character can be a sign
-	c, err := r.ReadByte()
-	if err == io.EOF {
-		if debugEnable {
-			log.Println("scanIntStr: unexpected EOF")
-		}
-		return "", false
-	}
-	if err != nil {
-		panic(err)
-	}
-	switch c {
-	case '-', '+':
-		sb.WriteByte(c)
-	default:
-		if err := r.UnreadByte(); err != nil {
-			panic(err)
-		}
-	}
-
-	// must be at least one digit
-	c, err = r.ReadByte()
-	if err == io.EOF {
-		if debugEnable {
-			log.Println("scanIntStr: unexpected EOF")
-		}
-		return "", false
-	}
-	if err != nil {
-		panic(err)
-	}
-	if !unicode.IsDigit(rune(c)) {
-		if debugEnable {
-			log.Printf("scanIntStr: expected digit, got '%c'", c)
-		}
-		return "", false
-	}
-	sb.WriteByte(c)
-
-	// next characters must be digits
-	for {
-		c, err = r.ReadByte()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
 			panic(err)
 		}
+
+		if debugEnable {
+			log.Printf("%s: c: '%c'", op, c)
+		}
+
+		if unicode.IsSpace(rune(c)) {
+			continue
+		}
+
+		if prevIsExpr {
+			switch c {
+			case ')':
+				token := string(c)
+				if debugEnable {
+					log.Printf("%s: token: '%v'", op, token)
+				}
+				tokens = append(tokens, token)
+			case '+', '-', '*':
+				token := string(c)
+				if debugEnable {
+					log.Printf("%s: token: '%v'", op, token)
+				}
+				tokens = append(tokens, token)
+				prevIsExpr = false
+			default:
+				return nil, false
+			}
+			continue
+		}
+
+		if c == '(' {
+			token := "("
+			if debugEnable {
+				log.Printf("%s: token: '%v'", op, token)
+			}
+			tokens = append(tokens, token)
+			continue
+		}
+
+		if err := r.UnreadByte(); err != nil {
+			panic(err)
+		}
+		token, ok := scanIntStr(r)
+		if !ok {
+			return nil, false
+		}
+		if debugEnable {
+			log.Printf("%s: token: '%v'", op, token)
+		}
+		tokens = append(tokens, token)
+		prevIsExpr = true
+	}
+
+	return tokens, true
+}
+
+func scanIntStr(r io.ByteScanner) (string, bool) {
+	const op = "scanIntStr"
+	var sb strings.Builder
+
+	// может быть унарный +/-
+	sign := 1
+	for {
+		c, err := r.ReadByte()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			panic(err)
+		}
+
+		if c == '-' {
+			sign = -sign
+		} else if c != '+' {
+			if err := r.UnreadByte(); err != nil {
+				panic(err)
+			}
+			break
+		}
+	}
+
+	if sign == -1 {
+		sb.WriteByte('-')
+	}
+
+	count := 0
+	for {
+		c, err := r.ReadByte()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			panic(err)
+		}
+
 		if !unicode.IsDigit(rune(c)) {
 			if err := r.UnreadByte(); err != nil {
 				panic(err)
 			}
 			break
 		}
+
+		count++
 		sb.WriteByte(c)
+	}
+
+	if count == 0 {
+		if debugEnable {
+			log.Printf("%s: digit was expected", op)
+		}
+		return "", false
 	}
 
 	return sb.String(), true
@@ -165,37 +164,65 @@ func (s *stack[T]) pop() T {
 	return c
 }
 
-// чем больше значение, тем выше приоритет
+// чем больше значение, тем выше приоритет, 0 зарезервирован для '('
 func getPriority(op string) int {
 	switch op {
-	case "*":
-		return 200
+	case "(":
+		return 0
 	case "+", "-":
 		return 100
+	case "*":
+		return 200
 	default:
 		panic(fmt.Errorf("unknown operation: %v", op))
 	}
 }
 
 func toPolish(tokens []string) ([]string, bool) {
+	const op = "toPolish"
+
 	type item struct {
 		token    string
 		priority int
 	}
 
-	var stack stack[item]
+	var (
+		stack      stack[item]
+		prevIsExpr bool // значение или выражение в скобках
+	)
 	res := make([]string, 0, len(tokens))
 
 	for _, token := range tokens {
+		if debugEnable {
+			log.Printf("%s: token: %v", op, token)
+		}
 		switch token {
 		case "(":
+			if prevIsExpr {
+				if debugEnable {
+					log.Printf("%s: want prev not expr", op)
+				}
+				return nil, false
+			}
+
 			// всегда кладем на стек, с наименьшим приоритетом
-			stack.push(item{token: "(", priority: 0})
+			stack.push(item{token: "(", priority: getPriority("(")})
 
 		case ")":
+			if !prevIsExpr {
+				if debugEnable {
+					log.Printf("%s: want prev expr", op)
+				}
+				return nil, false
+			}
+			prevIsExpr = true
+
 			// пререкладываем из стека в результат, пока не встертим скобку
 			for {
 				if stack.empty() {
+					if debugEnable {
+						log.Printf("%s: not balanced brackets", op)
+					}
 					return nil, false
 				}
 
@@ -209,6 +236,14 @@ func toPolish(tokens []string) ([]string, bool) {
 			}
 
 		case "+", "-", "*":
+			if !prevIsExpr {
+				if debugEnable {
+					log.Printf("%s: want prev expr", op)
+				}
+				return nil, false
+			}
+			prevIsExpr = false
+
 			// вытаскивает со стека все, чей приоритет выше или равен
 			prioryty := getPriority(token)
 			for !stack.empty() && stack.top().priority >= prioryty {
@@ -218,7 +253,15 @@ func toPolish(tokens []string) ([]string, bool) {
 			// и ложится на стек
 			stack.push(item{token: token, priority: prioryty})
 
-		default:
+		default: // иначе это значение
+			if prevIsExpr {
+				if debugEnable {
+					log.Printf("%s: want prev not expr", op)
+				}
+				return nil, false
+			}
+			prevIsExpr = true
+
 			// всегда ложится в результат
 			res = append(res, token)
 		}
