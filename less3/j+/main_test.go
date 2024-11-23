@@ -42,7 +42,7 @@ func runTests() []runTest {
 			true,
 		},
 		{
-			"3???",
+			"3",
 			runArgs{strings.NewReader(`6 15
 1 2 5 7 8 11
 1 1 4 2 3 6
@@ -70,7 +70,7 @@ func runTests() []runTest {
 	}
 }
 
-func Test_run(t *testing.T) {
+func testRun(t *testing.T, solve func(_ int, _, _ []int) int) {
 	for _, tt := range runTests() {
 		t.Run(tt.name, func(t *testing.T) {
 			defer func(v bool) { debugEnable = v }(debugEnable)
@@ -84,18 +84,16 @@ func Test_run(t *testing.T) {
 	}
 }
 
+func Test_run(t *testing.T) {
+	testRun(t, solve)
+}
+
 func Test_slowRun(t *testing.T) {
-	for _, tt := range runTests() {
-		t.Run(tt.name, func(t *testing.T) {
-			defer func(v bool) { debugEnable = v }(debugEnable)
-			debugEnable = tt.debug
-			out := &bytes.Buffer{}
-			run(tt.args.in, out, slowSolve)
-			if gotOut := out.String(); trimLines(gotOut) != trimLines(tt.wantOut) {
-				t.Errorf("run() = %v, want %v", gotOut, tt.wantOut)
-			}
-		})
-	}
+	testRun(t, slowSolve)
+}
+
+func Test_fastRun(t *testing.T) {
+	testRun(t, fastSolve)
 }
 
 func trimLines(text string) string {
@@ -152,7 +150,7 @@ func testSolveN(f *testing.F, n int) {
 	f.Fuzz(func(t *testing.T, a uint) {
 		h, hh, ww := genData(a, n, n, n)
 
-		res1 := slowSolve(h, hh, ww)
+		res1 := fastSolve(h, hh, ww)
 		res2 := solve(h, hh, ww)
 
 		if res1 != res2 {
@@ -169,7 +167,7 @@ func Fuzz_solve10(f *testing.F) {
 }
 
 func Fuzz_solve100(f *testing.F) {
-	testSolveN(f, 10000)
+	testSolveN(f, 100)
 }
 
 func Fuzz_solve1000(f *testing.F) {
@@ -178,4 +176,8 @@ func Fuzz_solve1000(f *testing.F) {
 
 func Fuzz_solve10000(f *testing.F) {
 	testSolveN(f, 10000)
+}
+
+func Fuzz_solve100000(f *testing.F) {
+	testSolveN(f, 100000)
 }
