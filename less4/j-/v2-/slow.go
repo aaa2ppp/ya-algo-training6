@@ -52,7 +52,7 @@ func slowSolve(edges Edges, graph Graph) int {
 		matrix, curMatrix = curMatrix, matrix
 
 		if debugEnable {
-			logBitMatrix(fmt.Sprintf("%d-%d", begin, end-1), matrix, n)
+			logBitMatrix(fmt.Sprintf("%d [%d..%d]", node, begin, end-1), matrix, n)
 		}
 	}
 
