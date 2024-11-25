@@ -7,6 +7,6 @@ bin/parse: ./cmd/parse/*.go
 build: bin/stat bin/parse
 
 stat: build
-	./stat.sh
+	sh stat.sh
 
 .PHONE: build stat
