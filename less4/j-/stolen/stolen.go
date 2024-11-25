@@ -132,7 +132,7 @@ func stolenSolve(graph Graph, dir EdgeDirs) int {
 					}
 
 					dp[node][i] += v
-					dp[node][1] %= modulo
+					dp[node][i] %= modulo
 				}
 			}
 		}
