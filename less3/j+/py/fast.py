@@ -1,6 +1,6 @@
-from sys import stdin
-
 # O(n) в среднем на рандомных данных, O(n^2) в худшем случае. см. тест 999
+
+from sys import stdin
 
 data = stdin.read().splitlines()
 n, H = map(int, data[0].split())

@@ -14,4 +14,5 @@ while h <= max_h and n > 0:
 #print(n)
 print(len(hh), len(hh))
 print(*hh)
-print(*[1]*len(hh))
+ww = [i for i in range(1, len(hh)+1)]
+print(*ww)
