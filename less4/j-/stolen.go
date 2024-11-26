@@ -1,16 +1,45 @@
 package main
 
+type (
+	_Graph   [][]Idx
+	EdgeDirs map[Edge]bool
+)
+
+func stolenSolve(edges []Edge) int {
+	n := len(edges) + 1
+	graph := make(_Graph, n+1)
+	dir := make(EdgeDirs, n)
+
+	for _, e := range edges {
+		a := e[0]
+		b := e[1]
+		dir[Edge{a, b}] = true
+		dir[Edge{b, a}] = false
+		graph[a] = append(graph[a], b)
+		graph[b] = append(graph[b], a)
+	}
+
+	return _stolenSolve(graph, dir)
+}
+
 // stole solve from
 // https://www.hackerrank.com/contests/hourrank-29/challenges/birthday-assignment/problem
 
-func stolenSolve(graph Graph, dir EdgeDirs) int {
+func _stolenSolve(graph _Graph, dir EdgeDirs) int {
 	n := len(graph)
 	sz := make([]int, n)
 	dp := makeMatrix[int](n, n)
 
-	var dfs func(node, prev Node)
+	nCr := func(n, r int) int {
+		if r > n {
+			return 0
+		}
+		return paskal(n, r)
+	}
 
-	dfs = func(node, prev Node) {
+	var dfs func(node, prev Idx)
+
+	dfs = func(node, prev Idx) {
 		sz[node] = 1
 		var total_down, total_up int
 
@@ -118,8 +147,8 @@ func stolenSolve(graph Graph, dir EdgeDirs) int {
 
 				for j := 0; j <= min(i-1, total_down); j++ {
 					x := total_down - j
-					v := down_p[j] % modulo
-					v *= nCr(i-1, j)
+					v := nCr(i-1, j)
+					v *= down_p[j]
 					v %= modulo
 					v *= nCr(sz[node]-i, x)
 					v %= modulo
@@ -147,11 +176,4 @@ func stolenSolve(graph Graph, dir EdgeDirs) int {
 	}
 
 	return count
-}
-
-func nCr(n, r int) int {
-	if r > n {
-		return 0
-	}
-	return paskal(n, r)
 }

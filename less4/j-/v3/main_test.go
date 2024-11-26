@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-const test_data = "./test_data/"
+const test_data = "../test_data/"
 
 func Test_run_solenSolve(t *testing.T) {
 	run_solve(t, stolenSolve)

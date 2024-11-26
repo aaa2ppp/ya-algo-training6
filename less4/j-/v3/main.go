@@ -44,15 +44,9 @@ func solve(edges []Edge) int {
 	return _solve(graph)
 }
 
-// TOD
-type DP struct {
-	prev []Size
-	cur  []Size
-}
-
 func _solve(graph Graph) int {
 	n := len(graph)
-	size := make([]Size, n)
+	sz := make([]Size, n)
 	dp := makeMatrix[Size](n, n)
 
 	nCr64 := func(n, r int) int64 {
@@ -65,173 +59,139 @@ func _solve(graph Graph) int {
 	var dfs func(node, prev Idx)
 
 	dfs = func(node, prev Idx) {
-		size[node] = 1
-		var downSize, upSize int
+		sz[node] = 1
+		var downCount, upCount int
 
-		// идем вниз
-		for _, child := range graph[node].down {
-			if child == prev {
+		for _, neig := range graph[node].down {
+			if neig == prev {
 				continue
 			}
 
-			dfs(child, node)
+			dfs(neig, node)
+			sz[node] += sz[neig]
+			downCount += int(sz[neig])
 
-			// насчитываем размер поддерева с корнем в node
-			size[node] += size[child]
-
-			// насчитываем рамер нижней половины
-			downSize += int(size[child])
-
-			// ???
-			for j, n := 1, int(size[child]); j <= n; j++ {
-				dp[child][j] += dp[child][j-1]
-				dp[child][j] %= modulo
+			for i, n := 1, int(sz[neig]); i <= n; i++ {
+				dp[neig][i] += dp[neig][i-1]
+				dp[neig][i] %= modulo
 			}
 		}
 
-		// идем вверх
-		for _, child := range graph[node].up {
-			if child == prev {
+		for _, neig := range graph[node].up {
+			if neig == prev {
 				continue
 			}
 
-			dfs(child, node)
+			dfs(neig, node)
+			sz[node] += sz[neig]
+			upCount += int(sz[neig])
 
-			// насчитываем размер поддерева с корнем в node
-			size[node] += size[child]
-
-			// насчитываем рамер верхней половины
-			upSize += int(size[child])
-
-			// ???
-			for j := size[child]; j >= 1; j-- {
-				dp[child][j] += dp[child][j+1]
-				dp[child][j] %= modulo
+			for i := sz[neig]; i >= 1; i-- {
+				dp[neig][i] += dp[neig][i+1]
+				dp[neig][i] %= modulo
 			}
 		}
 
-		// дерево из одного узла может иметь только одну топсортировку
-		// узел может находиться только в позиции 1 (1-indexing)
-		// TODO: to 0-indexing мне так привычнее вычислять диапазны от начала и конца (не будет болтаться 1-ка)
-		if size[node] == 1 {
+		if sz[node] == 1 {
 			dp[node][1] = 1
 			return
 		}
 
-		// из prev будем насчитывать ??? в cur
 		var (
-			downDP_prev  = make([]Size, downSize+1)
-			downDP_cur   = make([]Size, downSize+1)
-			downDP_count = 0
+			prevDown = make([]Size, downCount+1)
+			curDown  = make([]Size, downCount+1)
 		)
-		downDP_prev[0] = 1 // какой физсмысл индекса, 1 понятно - мы умножаем
 
-		for _, child := range graph[node].down {
-			if child == prev {
+		prevDown[0] = 1
+		downCount = 0
+
+		for _, neig := range graph[node].down {
+			if neig == prev {
 				continue
 			}
 
-			clear(downDP_cur[:downDP_count])
-			downDP_count += int(size[child]) // добавляем поддеревя, увеличивам кол-во позиций сортировки
+			downCount += int(sz[neig])
 
-			// двигаем позицию дочернего поддерева начиная с 0? у нас же 1-indexing
-			// какой физ смысл i? это позиция чего?
-			for i := 0; i < downDP_count; i++ {
-				if downDP_prev[i] == 0 { // ну как-бы логично, считать нечего
+			for i := 0; i <= downCount; i++ {
+				if prevDown[i] == 0 {
 					continue
 				}
 
-				// (?) что мы здесь считаем?
-				// двигаем j от 1 до размера дерева, какой физсмысл j?
-				// ок, похоже это позиция в поддереве...
-				for j, n := 1, int(size[child]); j <= n; j++ {
-
-					v := nCr64(i+j, j) // комбинируем, а что с чем? похоже, что i и j это размеры...
-					// ну здесь понятно до текущей позиции корня дерева, до текущей позиции в поддереве
-					v *= int64(dp[child][j]) // умножаем на внутренню сложность
-					// сложность подсказывает
-					v %= modulo
-
-					// по идее что комбинируем, ту сложность и добавляем
-					// попробуем разобраться...
-
-					// это видимо внутрення сложность того, что мы добавляем следом
-					v *= int64(downDP_prev[i]) // еще какая-то сложность
-					v %= modulo
-					// размер дочернего поддерева - j, т.е j это позиция в дочернем поддереве
-					// текущий размер поддерева - (i+j)
-					// downCount - i - j - (chidSize - j) = downCount - chidSize - i
-					// т.е выкинули из дерева поддерево и все по потекущу позцию и скомбинировали
-					// с поддеревом из которого выкинули все по текущую позицию внем
-					v *= nCr64(downDP_count-(i+j), int(size[child])-j) // и опять, что-то конбинируем
-					v %= modulo
-
-					// какой физсмысл (i+j)?
-					downDP_cur[i+j] += Size(v)
-					downDP_cur[i+j] %= modulo
-				}
-			}
-
-			// меняем местами prev и cur, чтобы повторно использовать память
-			downDP_prev, downDP_cur = downDP_cur, downDP_prev
-		}
-
-		var (
-			upDP_prev  = make([]Size, upSize+1)
-			upDP_cur   = make([]Size, upSize+1)
-			upDP_count = 0
-		)
-		upDP_prev[0] = 1
-
-		for _, child := range graph[node].up {
-			if child == prev {
-				continue
-			}
-
-			clear(upDP_cur[:upDP_count])
-			upDP_count += int(size[child])
-
-			for i := 0; i < upDP_count; i++ {
-				if upDP_prev[i] == 0 {
-					continue
-				}
-
-				// здесь все наоборот j это позиция с конца? или количество элементов с конца
-				// если это кол-во то какого черта j, если это позиция, то...
-				for j, n := 1, int(size[child]); j <= n; j++ {
+				for j, n := 1, int(sz[neig]); j <= n; j++ {
 					v := nCr64(i+j, j)
-					v *= int64(dp[child][int(size[child])-j+1])
+					v *= int64(dp[neig][j])
 					v %= modulo
-					v *= int64(upDP_prev[i])
+					v *= int64(prevDown[i])
 					v %= modulo
-					v *= nCr64(upDP_count-(i+j), int(size[child])-j)
+					v *= nCr64(downCount-(i+j), int(sz[neig])-j)
 					v %= modulo
 
-					upDP_cur[i+j] += Size(v)
-					upDP_cur[i+j] %= modulo
+					curDown[i+j] += Size(v)
+					curDown[i+j] %= modulo
 				}
+
+				prevDown[i] = 0
 			}
 
-			upDP_prev, upDP_cur = upDP_cur, upDP_prev
+			prevDown, curDown = curDown, prevDown
 		}
 
-		for i, n := 1, int(size[node]); i <= n; i++ {
+		var (
+			prevUp = make([]Size, upCount+1)
+			curUp  = make([]Size, upCount+1)
+		)
+
+		prevUp[0] = 1
+		upCount = 0
+
+		for _, neig := range graph[node].up {
+			if neig == prev {
+				continue
+			}
+
+			upCount += int(sz[neig])
+
+			for i := 0; i <= upCount; i++ {
+				if prevUp[i] == 0 {
+					continue
+				}
+
+				for j, n := 1, int(sz[neig]); j <= n; j++ {
+					v := nCr64(i+j, j)
+					v *= int64(dp[neig][int(sz[neig])-j+1])
+					v %= modulo
+					v *= int64(prevUp[i])
+					v %= modulo
+					v *= nCr64(upCount-(i+j), int(sz[neig])-j)
+					v %= modulo
+
+					curUp[i+j] += Size(v)
+					curUp[i+j] %= modulo
+				}
+
+				prevUp[i] = 0
+			}
+
+			prevUp, curUp = curUp, prevUp
+		}
+
+		for i, n := 1, int(sz[node]); i <= n; i++ {
 			dp[node][i] = 0
 
-			for j, n := 0, min(i-1, downSize); j <= n; j++ {
-				x := downSize - j
-				y := int(size[node]) - i
+			for j, n := 0, min(i-1, downCount); j <= n; j++ {
+				x := downCount - j
+				y := int(sz[node]) - i
 
-				if !(0 <= y-x && y-x <= upSize) {
+				if !(0 <= y-x && y-x <= upCount) {
 					continue
 				}
 
 				v := nCr64(i-1, j)
-				v *= int64(downDP_prev[j])
+				v *= int64(prevDown[j])
 				v %= modulo
 				v *= nCr64(y, x)
 				v %= modulo
-				v *= int64(upDP_prev[y-x])
+				v *= int64(prevUp[y-x])
 				v %= modulo
 
 				dp[node][i] += Size(v)
