@@ -4,7 +4,7 @@ pref='20241[01]*'
 prev=
 
 for d in $(ls -d ${pref} | sort); do
-    for i in 1 2 3; do
+    for i in 1 2 3 4; do
         if ! [ -f $d/less$i.csv ] && [ -f $d/less$i.html ]; then
             ./bin/parse $d/less$i.html > $d/less$i.csv
         fi
