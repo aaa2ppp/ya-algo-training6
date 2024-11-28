@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"io"
@@ -69,8 +70,27 @@ func Test_solve3000(t *testing.T) {
 }
 
 var (
-	bench_res   int
-	bench_edges = genEdges(rand.New(rand.NewSource(1)), 3000)
+	bench_res      int
+	bench_edges    = genEdges(rand.New(rand.NewSource(1)), 3000)
+	bench_edges_69 = func() []Edge {
+		buf := readTestFile("69")
+		sc := bufio.NewScanner(bytes.NewReader(buf))
+		sc.Split(bufio.ScanWords)
+
+		n, err := scanInt(sc)
+		if err != nil {
+			panic(err)
+		}
+		edges := make([]Edge, n-1)
+		for i := range edges {
+			a, b, err := scanTwoIntX[Idx](sc)
+			if err != nil {
+				panic(err)
+			}
+			edges[i] = Edge{a, b}
+		}
+		return edges
+	}()
 )
 
 func Benchmark_solve(b *testing.B) {
@@ -86,16 +106,23 @@ func Benchmark_solve(b *testing.B) {
 	})
 }
 
-func run_solve(t *testing.T, solve SolveFunc) {
-
-	readFile := func(filename string) []byte {
-		buf, err := os.ReadFile(test_data + filename)
-		if err != nil {
-			panic(err)
+func Benchmark_solve_69(b *testing.B) {
+	b.Run("solve_69", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			bench_res = solve(bench_edges_69)
 		}
-		return buf
-	}
+	})
+}
 
+func readTestFile(filename string) []byte {
+	buf, err := os.ReadFile(test_data + filename)
+	if err != nil {
+		panic(err)
+	}
+	return buf
+}
+
+func run_solve(t *testing.T, solve SolveFunc) {
 	type args struct {
 		in io.Reader
 	}
@@ -244,22 +271,29 @@ func run_solve(t *testing.T, solve SolveFunc) {
 			`42`,
 			false,
 		},
+		// {
+		// 	// Can't stolenSolve TL
+		// 	"69",
+		// 	args{bytes.NewReader(readTestFile("69"))},
+		// 	unsafeString(readTestFile("69.a")),
+		// 	false,
+		// },
 		{
 			"999",
-			args{bytes.NewReader(readFile("999"))},
-			unsafeString(readFile("999.a")),
+			args{bytes.NewReader(readTestFile("999"))},
+			unsafeString(readTestFile("999.a")),
 			false,
 		},
 		{
 			"998",
-			args{bytes.NewReader(readFile("998"))},
-			unsafeString(readFile("998.a")),
+			args{bytes.NewReader(readTestFile("998"))},
+			unsafeString(readTestFile("998.a")),
 			false,
 		},
 		{
 			"997",
-			args{bytes.NewReader(readFile("997"))},
-			unsafeString(readFile("997.a")),
+			args{bytes.NewReader(readTestFile("997"))},
+			unsafeString(readTestFile("997.a")),
 			false,
 		},
 		// TODO: Add test cases.

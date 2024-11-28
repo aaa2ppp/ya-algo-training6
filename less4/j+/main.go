@@ -1,3 +1,4 @@
+// #2
 package main
 
 import (
@@ -5,8 +6,10 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"os"
 	"strconv"
+	"time"
 	"unsafe"
 )
 
@@ -45,9 +48,13 @@ func solve(edges []Edge) int {
 }
 
 func _solve(graph Graph) int {
-	n := len(graph)
-	dp := makeMatrix[Size](n, n) // (!) both dir 1-indexing
-	sizes := make([]Size, n)
+	var (
+		n          = len(graph)
+		dp         = makeMatrix[Size](n, n) // (!) both dir 1-indexing
+		sizes      = make([]Size, n)
+		upCounts   = make([]Size, n)
+		downCounts = make([]Size, n)
+	)
 
 	nCr64 := func(n, r int) int64 {
 		if r > n {
@@ -108,6 +115,8 @@ func _solve(graph Graph) int {
 		}
 
 		sizes[node] = Size(size)
+		upCounts[node] = Size(upCount)
+		downCounts[node] = Size(downCount)
 
 		if size == 1 {
 			dp[node][1] = 1
@@ -128,14 +137,16 @@ func _solve(graph Graph) int {
 			}
 
 			childSize := int(sizes[child])
-			count += childSize
+			childUpCount := int(upCounts[child])
+			childDownCount := int(downCounts[child])
+			count += childSize - childDownCount
 
 			for i := upCount; i <= count; i++ {
 				if upDP[i] == 0 {
 					continue
 				}
 
-				for j := 1; j <= childSize; j++ {
+				for j, n := childUpCount, childSize-childDownCount; j <= n; j++ {
 					p := i + j // positions after merge with child subtree
 
 					v := int64(upDP[i])
@@ -152,10 +163,10 @@ func _solve(graph Graph) int {
 			}
 
 			upDP, buf = buf, upDP
-			clear(buf[:count])
+			clear(buf[upCount:count])
 		}
 
-		clear(buf)
+		// clear(buf)
 		count, downDP[0] = downCount, 1
 		for _, child := range graph[node].down {
 			if child == prev {
@@ -163,14 +174,16 @@ func _solve(graph Graph) int {
 			}
 
 			childSize := int(sizes[child])
-			count += childSize
+			childUpCount := int(upCounts[child])
+			childDownCount := int(downCounts[child])
+			count += childSize - childUpCount
 
 			for i := downCount; i <= count; i++ {
 				if downDP[i] == 0 {
 					continue
 				}
 
-				for j := 1; j <= childSize; j++ {
+				for j, n := childDownCount, childSize-childUpCount; j <= n; j++ {
 					p := i + j // positions after merge with child subtree
 
 					v := int64(downDP[i])
@@ -187,7 +200,7 @@ func _solve(graph Graph) int {
 			}
 
 			downDP, buf = buf, downDP
-			clear(buf[:count])
+			clear(buf[downCount:count])
 		}
 
 		for i := 1; i <= size; i++ {
@@ -217,11 +230,13 @@ func _solve(graph Graph) int {
 		return size, upCount, downCount
 	}
 
-	dfs(1, 0, false)
+	rand := rand.New(rand.NewSource(time.Now().UnixNano()))
+	root := Idx(rand.Intn(n-1) + 1)
+	dfs(root, 0, false)
 
 	var count int
 	for i := 1; i < n; i++ {
-		count += int(dp[1][i])
+		count += int(dp[root][i])
 		count %= modulo
 	}
 
