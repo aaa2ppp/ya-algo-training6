@@ -10,17 +10,16 @@ import (
 	"unsafe"
 )
 
-type Idx int32
-
-type Graph [][]Idx
+type (
+	Idx   int32
+	Size  int32
+	Graph [][]Idx
+)
 
 func solve(graph Graph, modulo int) int {
 	const op = "solve"
 
-	res := 1
-
 	comps, ok := searchComponents(graph)
-
 	if !ok {
 		return 0
 	}
@@ -29,13 +28,11 @@ func solve(graph Graph, modulo int) int {
 	lonerCount := 0
 	totalCount := 0
 	for i := len(comps) - 1; i >= 0; i-- {
-		n := comps[i].size
-		totalCount += n
-		if n == 1 {
+		compSize := int(comps[i].size)
+		totalCount += compSize
+		if compSize == 1 {
 			lonerCount++
-			n := len(comps)
-			comps[i] = comps[n-1]
-			comps = comps[:n-1]
+			comps = remove(comps, i)
 		}
 	}
 
@@ -45,11 +42,9 @@ func solve(graph Graph, modulo int) int {
 		log.Printf("%s: total points %d", op, totalCount)
 	}
 
-	// перестановки одиночек
-	res *= fact(lonerCount, modulo)
-	res %= modulo
+	res := 1
 
-	// ситаем внутреннюю жизнь компонент
+	// считаем "внутреннюю жизнь" компонент
 	for _, comp := range comps {
 		n := calcComponent(graph, comp, modulo)
 		if n == 0 {
@@ -59,13 +54,17 @@ func solve(graph Graph, modulo int) int {
 		res %= modulo
 	}
 
-	// перестановки компонентов
+	// перестановки компонент
 	res *= fact(len(comps), modulo)
 	res %= modulo
 
-	// одиночки могут вклиниватся в любое место гупп. +1 так как два дерева
+	// одиночки могут вклиниватся в любое место. +1 так как два дерева
 	// за счет этого добавляется одно место (перегородка)
-	res *= paskal5(totalCount+1, lonerCount, modulo)
+	res *= nCk5(totalCount+1, lonerCount, modulo)
+	res %= modulo
+
+	// перестановки одиночек
+	res *= fact(lonerCount, modulo)
 	res %= modulo
 
 	return res
@@ -73,19 +72,21 @@ func solve(graph Graph, modulo int) int {
 
 type Component struct {
 	node Idx
-	size int
+	size Size
 }
 
 func calcComponent(graph Graph, comp Component, k int) int {
 	const op = "calcComponent"
 
-	// check point или p2p - симетрия по горизонтали
+	// check point - симетрия только по горизонтали
 	if comp.size == 1 {
 		if debugEnable {
 			log.Printf("%s: %v is point", op, comp)
 		}
 		return 2
 	}
+
+	// check p2p - симетрия только по горизонтали
 	if comp.size == 2 {
 		if debugEnable {
 			log.Printf("%s: %v is p2p", op, comp)
@@ -94,8 +95,8 @@ func calcComponent(graph Graph, comp Component, k int) int {
 	}
 
 	type hub struct {
-		hubN   int
-		pointN int
+		hubN   Size
+		pointN Size
 	}
 
 	var hubs []hub
@@ -128,8 +129,8 @@ func calcComponent(graph Graph, comp Component, k int) int {
 
 		if nodeIsHub {
 			hubs = append(hubs, hub{
-				hubN:   hubN,
-				pointN: pointN,
+				hubN:   Size(hubN),
+				pointN: Size(pointN),
 			})
 		}
 
@@ -160,7 +161,7 @@ func calcComponent(graph Graph, comp Component, k int) int {
 			return 0
 		}
 
-		res *= fact(hub.pointN, k)
+		res *= fact(int(hub.pointN), k)
 		res %= k
 	}
 
@@ -202,13 +203,13 @@ func searchComponents(graph Graph) ([]Component, bool) {
 
 	for node := 1; node < n; node++ {
 		if !visited[node] {
-			n, ok := dfs(Idx(node), -1)
+			size, ok := dfs(Idx(node), -1)
 			if !ok {
 				return nil, false
 			}
 			comps = append(comps, Component{
 				node: Idx(node),
-				size: n,
+				size: Size(size),
 			})
 		}
 	}
@@ -224,168 +225,63 @@ func fact(n int, modulo int) int {
 	}
 
 	i := len(_fact)
-	f := _fact[i-1]
+	v := _fact[i-1]
 
 	for ; i <= n; i++ {
-		f *= i
-		f %= modulo
-		_fact = append(_fact, f)
+		v *= i
+		v %= modulo
+		_fact = append(_fact, v)
 	}
 
-	return f
+	return v
 }
 
-func paskal5(m, n int, modulo int) int {
-	// if n > m/2 {
-	// 	n = m - n
-	// }
-
-	bb := make([]int, 0, n)
-	for i := n; i > 1; i-- {
-		bb = append(bb, i)
+func remove[T any](aa []T, i int) []T {
+	n := len(aa)
+	if i < n-1 {
+		aa[i] = aa[n-1]
 	}
-	if debugEnable {
-		log.Printf("packal5: bb: %v", bb)
+	return aa[:n-1]
+}
+
+func nCk5(n, k int, modulo int) int {
+	if k > n/2 {
+		k = n - k
 	}
 
-	a := 1
-mainLoop:
-	for p := m - n + 1; p <= m; p++ {
-		p := p
-		for i := len(bb) - 1; i >= 0; i-- {
-			if p == 1 {
-				continue mainLoop
-			}
-			d := gcd(p, bb[i])
-			if d != 1 {
-				if debugEnable {
-					log.Printf("packal4: a:%d/%d=%d b:%d/%d=%d", p, d, p/d, bb[i], d, bb[i]/d)
-				}
-				p /= d
-				bb[i] /= d
-				if bb[i] == 1 {
-					n := len(bb)
-					bb[i] = bb[n-1]
-					bb = bb[:n-1]
-					if debugEnable {
-						log.Printf("packal5: bb: %v", bb)
-					}
-				}
+	aa := make([]int, k)
+	for i, v := 0, n-k+1; v <= n; i, v = i+1, v+1 {
+		aa[i] = v
+	}
+
+	for b := 2; b <= k; b++ {
+		b := b
+		for i := len(aa) - 1; i >= 0 && b != 1; i-- {
+			d := gcd(aa[i], b)
+			aa[i] /= d
+			b /= d
+			if aa[i] == 1 {
+				aa = remove(aa, i)
 			}
 		}
-		a *= p
-		a %= modulo
 	}
 
-	if debugEnable {
-		log.Printf("paskal5: bb: %v", bb)
+	v := 1
+	for _, a := range aa {
+		v *= a
+		v %= modulo
 	}
 
-	return a
+	return v
 }
 
-func paskal4(m, n int, modulo int) int {
-	// Пройтись по ряду, найти наибольшие наибольшие делители,
-	// а потом сократить на них числитель. По идее должно быть NlogN?
-	if n > m/2 {
-		n = m - n
-	}
-
-	b := 1
-	var ds []int
-	for i := 2; i <= n; i++ {
-		i := i
-		d := gcd(i, modulo)
-		if d != 1 {
-			ds = append(ds, d)
-			i /= d
-		}
-		b *= i
-		b %= modulo
-	}
-
-	a := 1
-	for p := m - n + 1; p <= m; p++ {
-		for i := len(ds) - 1; i >= 0; i-- {
-			d := gcd(p, ds[i])
-			if d != 1 {
-				p /= d
-				ds[i] /= d
-				if ds[i] == 1 {
-					n := len(ds)
-					ds[i] = ds[n-1]
-					ds = ds[:n-1]
-				}
-			}
-		}
-		a *= p
-		a %= modulo
-	}
-
-	a *= invmod(b, modulo)
-	a %= modulo
-
-	return a
-}
-
-func paskal3(m, n int, modulo int) int {
-
-	a := 1
-	for p := m - n + 1; p <= m; p++ {
-		a *= p
-		a %= modulo
-	}
-
-	b := fact(n, modulo)
-
-	a *= invmod(b, modulo)
-	a %= modulo
-
-	return a
-}
-
-func paskal2(m, n int, modulo int) int {
-	if n > m/2 {
-		n = m - n
-	}
-	a := fact(m, modulo)
-	b := fact(n, modulo)
-	b *= fact(m-n, modulo)
-	b %= modulo
-	a *= invmod(b, modulo)
-	a %= modulo
-	return a
-}
-
-func paskal(m, n int, modulo int) int {
-	if debugEnable {
-		log.Printf("paskal: %d %d", m, n)
-	}
-
-	// std::cin >> m >> n;
-	// if (n > m / 2)
-	//    n = m - n;
-	if n > m/2 {
-		n = m - n
-	}
-
-	// std::vector<unsigned> v(m + 1, 1);
-	v := make([]int, m+1)
-	for i := range v {
-		v[i] = 1
-	}
-
-	// for (unsigned cm = 0; cm <= m; cm++)
-	//    for (unsigned i = m + 1 - cm; i < m; i++)
-	// 	  v[i] = (v[i] + v[i + 1]) % modulus;
-	for cm := 0; cm <= m; cm++ {
-		for i := m + 1 - cm; i < m; i++ {
-			v[i] = (v[i] + v[i+1]) % modulo
-		}
-	}
-
-	// std::cout << v[n] << std::endl;
-	return v[n]
+func nCk2(n, k int, modulo int) int {
+	v := fact(k, modulo)
+	v *= fact(n-k, modulo)
+	v %= modulo
+	v = invmod(v, modulo) * fact(n, modulo)
+	v %= modulo
+	return v
 }
 
 func run(in io.Reader, out io.Writer) {
@@ -399,6 +295,11 @@ func run(in io.Reader, out io.Writer) {
 		panic(err)
 	}
 
+	if m > n-1 {
+		bw.WriteString("0\n")
+		return
+	}
+
 	graph := make(Graph, n+1)
 
 	for i := 0; i < m; i++ {
@@ -410,9 +311,9 @@ func run(in io.Reader, out io.Writer) {
 		graph[b] = append(graph[b], Idx(a))
 	}
 
-	if debugEnable {
-		log.Println("graph:", graph)
-	}
+	// if debugEnable {
+	// 	log.Println("graph:", graph)
+	// }
 
 	res := solve(graph, k)
 
